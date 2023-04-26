@@ -1,0 +1,8 @@
+# aws lambda get-function --function-name arn:aws:lambda:eu-central-1:267905148465:function:dummy-lmb-prg1-dev-euc1
+# aws lambda invoke — function-name arn:aws:lambda:eu-central-1:267905148465:function:dummy-lmb-prg1-dev-euc1
+
+# aws lambda invoke \
+#     --cli-binary-format raw-in-base64-out \
+#     --function-name dummy-lmb-prg1-dev-euc1 \
+#     --payload '{ "name": "Bob" }' \
+#     response.json

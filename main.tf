@@ -69,9 +69,6 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
   policy_arn = aws_iam_policy.lambda_policy.arn
 }
 
-
-
-
 resource "aws_security_group" "this" {
   name        = module.name.security_group
   description = "security group for lambda"
@@ -110,30 +107,47 @@ module "lmb" {
   }
 }
 
-# resource "aws_api_gateway_rest_api" "this" {
-#   body = jsonencode({
-#     openapi = "3.0.1"
-#     info = {
-#       title   = "example"
-#       version = "1.0"
-#     }
-#     paths = {
-#       "/path1" = {
-#         get = {
-#           x-amazon-apigateway-integration = {
-#             httpMethod           = "GET"
-#             payloadFormatVersion = "1.0"
-#             type                 = "HTTP_PROXY"
-#             uri                  = "https://ip-ranges.amazonaws.com/ip-ranges.json"
-#           }
-#         }
-#       }
-#     }
-#   })
+# I used this website to develop this part
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/api_gateway_integration.html
+resource "aws_api_gateway_rest_api" "this" {
+  name        = module.name.api_gtw
+  description = "Call Lambda"
+  tags = {
+    By   = "parisamoosavinezhad@hotmail.com"
+    Name = module.name.lambda
+  }
+}
 
-#   name = module.name.api_gtw
+resource "aws_api_gateway_resource" "this" {
+  parent_id   = aws_api_gateway_rest_api.this.root_resource_id
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  path_part   = var.name
+}
 
-#   endpoint_configuration {
-#     types = ["REGIONAL"]
-#   }
-# }
+resource "aws_api_gateway_method" "this" {
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.this.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "this" {
+  rest_api_id             = aws_api_gateway_rest_api.this.id
+  resource_id             = aws_api_gateway_resource.this.id
+  http_method             = aws_api_gateway_method.this.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = module.lmb.invoke_arn
+}
+
+# use service principal for AWS services
+# https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html#principal-services
+resource "aws_lambda_permission" "this" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lmb.name
+  principal     = "apigateway.amazonaws.com"
+
+  # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
+  source_arn = "${aws_api_gateway_rest_api.this.execution_arn}/*/${aws_api_gateway_method.this.http_method}${aws_api_gateway_resource.this.path}"
+}
